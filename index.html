@@ -258,6 +258,7 @@ S.cfg=Object.assign({time:60,streak:3,sfx:true,music:true,goal:0,vm:60,vs:60,int
 if(!S.teams||S.teams.length<2)S.teams=['Equip 1','Equip 2'];
 if(S.cfg.maxs===10)S.cfg.maxs=6;
 if(!S.drink)S.drink=defs().drink;
+if(!S.forb)S.forb={id:'forb',n:'Paraules prohibides',i:'🚫',h:'',w:[...FORB]};
 if(!S.cards)S.cards={id:'cards',n:'Cartes sorpresa',i:'🃏',h:'',w:CARDS.split('|')};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const pool=()=>[...S.classic,...S.mime,...S.custom];
@@ -493,7 +494,7 @@ function renderBet(){
 }
 $('#bet').onclick=e=>{const c=e.target.closest('[data-b]');if(c&&!D.seen){D.bet=+c.dataset.b;renderBet();renderMod()}};
 function newForb(){
-  const o=FORB.filter(x=>x!==F.w), w=o[Math.random()*o.length|0];
+  const L=S.forb.w.length?S.forb.w:FORB, o=L.filter(x=>x!==F.w), pl=o.length?o:L, w=pl[Math.random()*pl.length|0];
   F={w,left:S.cfg.fn}; forbLine();
 }
 function forbLine(){
@@ -541,7 +542,7 @@ function openEditor(arr,idx,back){
   E={arr,idx,back}; const c=idx==null?{n:'',i:'',w:[]}:arr[idx];
   $('#e-title').textContent=idx==null?'Nova temàtica':'Editar temàtica';
   $('#e-name').value=c.n; $('#e-emoji').value=c.i; $('#e-words').value=c.w.join('\n');
-  $('#e-del').style.display=idx==null||arr[idx]===S.cards?'none':''; countW(); show('s-edit');
+  $('#e-del').style.display=idx==null||arr[idx]===S.cards||arr[idx]===S.forb?'none':''; countW(); show('s-edit');
 }
 $('#e-words').oninput=countW;
 $('#e-save').onclick=()=>{
@@ -570,10 +571,11 @@ function renderSet(){
     b.innerHTML=`<label class="setrow">Temps del temporitzador (s)<input type="number" inputmode="numeric" min="10" max="600" step="5" data-k="time" value="${S.cfg.time}"></label><label class="setrow">Encerts seguits per canviar d'equip<input type="number" inputmode="numeric" min="1" max="10" data-k="streak" value="${S.cfg.streak}"></label><label class="setrow">🎵 Volum de la música<input type="range" min="0" max="100" data-v="vm" value="${S.cfg.vm}"></label><label class="setrow">🔊 Volum dels sons<input type="range" min="0" max="100" data-v="vs" value="${S.cfg.vs}"></label><label class="setrow">🚫 Torns amb la mateixa paraula prohibida<input type="number" inputmode="numeric" min="1" max="20" data-k="fn" value="${S.cfg.fn}"></label><label class="setrow">🍺 Màxim de glops per torn<input type="number" inputmode="numeric" min="1" max="30" data-k="maxs" value="${S.cfg.maxs}"></label><div class="chips"><span class="note" style="width:100%;text-align:left">Intensitat del mode Beure</span>${['Suau','Normal','Picant'].map((n,i)=>`<button class="chip" data-n="${i}" aria-pressed="${S.cfg.int===i}">${n}</button>`).join('')}</div><div class="chips"><button class="chip" data-c="sfx" aria-pressed="${S.cfg.sfx}">🔊 Efectes</button><button class="chip" data-c="music" aria-pressed="${S.cfg.music}">🎵 Música</button></div>`;
     return;
   }
-  if(setMode==='drink')b.innerHTML='<p class="note">Afegeix #2 al final d\'una paraula perquè valgui glops extra.</p><button class="btn sm ghost" id="cards-btn">🃏 Cartes sorpresa</button>';
+  if(setMode==='drink')b.innerHTML='<p class="note">Afegeix #2 al final d\'una paraula perquè valgui glops extra.</p><button class="btn sm ghost" id="cards-btn">🃏 Cartes sorpresa</button><button class="btn sm ghost" id="forb-btn">🚫 Paraules prohibides</button>';
   if(setMode==='custom')b.innerHTML='<p class="note">Aquí hi ha les temàtiques que has creat. Les dels altres modes les tries dins de Personalitzat.</p>';
   catList(b,S[setMode],backSet);
   const cb=$('#cards-btn'); if(cb)cb.onclick=()=>openEditor([S.cards],0,backSet);
+  const fb=$('#forb-btn'); if(fb)fb.onclick=()=>openEditor([S.forb],0,backSet);
   if(setMode!=='custom'){
     const r=document.createElement('button'); r.className='btn sm ghost'; r.textContent='Restaurar valors per defecte';
     r.onclick=()=>ask('Es perdran els canvis d\'aquest mode. Continuar?','Restaurar').then(y=>{if(y){S[setMode]=defs()[setMode];save();renderSet()}});
