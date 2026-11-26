@@ -76,7 +76,7 @@ textarea{min-height:230px;resize:vertical}
 .mute{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:9;width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);background:#fff;font-size:20px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
 .score{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%}
 .tm{border:2.5px solid var(--ink);border-radius:999px;padding:4px 12px;background:#fff;font-weight:700;font-size:15px}
-.tm.on{background:#ffc93c}
+.tm.on{outline:3px solid var(--ink);outline-offset:2px;transform:scale(1.08)}
 .timer{font-size:30px;font-weight:900;min-width:96px;font-variant-numeric:tabular-nums}.timer.urgent{color:#e63946}
 .vd{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
 .v{font:inherit;font-size:34px;width:96px;height:76px;border:3px solid var(--ink);border-radius:20px;box-shadow:0 5px 0 var(--ink);cursor:pointer;color:var(--ink)}
@@ -100,6 +100,17 @@ textarea{min-height:230px;resize:vertical}
 .full .btn{background:#fff}
 .bigw{font-size:clamp(64px,26vw,150px);font-weight:900;line-height:1;overflow-wrap:anywhere}
 .logo{width:min(56vw,220px);height:auto;border:3px solid var(--ink);border-radius:26px;box-shadow:0 6px 0 var(--ink)}
+.adv{width:100%;text-align:left;border:3px solid var(--ink);border-radius:16px;background:#fff;padding:10px 14px}
+.adv summary{font-weight:800;cursor:pointer}
+#score{cursor:pointer}
+.pb,.pr{width:100%;border:3px solid var(--ink);border-radius:18px;box-shadow:0 4px 0 var(--ink);display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;color:var(--ink);font:inherit}
+.pb{padding:14px 16px;font-size:22px;cursor:pointer}
+.pb:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+.pb small,.pn small,.pv small{display:block;font-size:13px;font-weight:700}
+.pr{padding:12px 16px}
+.pn{font-size:24px;font-weight:900;display:flex;flex-direction:column}
+.pv{font-size:28px;font-weight:900;text-align:right}
+#turn{font-size:24px;font-weight:900;color:var(--ink)}
 </style>
 </head>
 <body>
@@ -176,12 +187,12 @@ textarea{min-height:230px;resize:vertical}
 <main class="screen" id="s-teams">
   <div class="top"><button class="btn sm ghost" id="t-back" aria-label="Tornar">←</button><h2>Equips</h2></div>
   <p class="sub">Posa nom als equips (mínim 2, màxim 6)</p>
-  <p class="note" id="t-note"></p>
   <div class="list" id="t-list"></div>
   <button class="btn sm ghost" id="t-add">+ Afegir equip</button>
   <h3>Punts per guanyar</h3>
   <div class="chips" id="t-goal"></div>
   <input type="number" id="t-goal-n" inputmode="numeric" min="1" max="999" placeholder="Altres punts (ex.: 7)" aria-label="Punts personalitzats per guanyar">
+  <details class="adv" id="adv" style="display:none"><summary>⚙️ Ajustos avançats</summary><div id="adv-body"></div></details>
   <button class="btn" id="t-go">Començar</button>
 </main>
 <main class="screen full" id="s-forb" style="--fc:#ff5a5f">
@@ -197,6 +208,15 @@ textarea{min-height:230px;resize:vertical}
   <h2 id="ch-x" style="font-size:clamp(26px,8vw,40px)"></h2>
   <p class="note" style="color:var(--ink)">Els glops d'aquest torn es dupliquen (×2)</p>
   <button class="btn" id="ch-ok">Acceptar el repte</button>
+</main>
+<main class="screen" id="s-give">
+  <h1 id="gv-t" style="font-size:28px"></h1>
+  <p class="sub">Tria a qui els dones</p>
+  <div class="list" id="gv-list"></div>
+</main>
+<main class="screen" id="s-stats">
+  <div class="top"><button class="btn sm ghost" id="st-back" aria-label="Tornar">←</button><h2>Glops</h2></div>
+  <div class="list" id="st-body"></div>
 </main>
 <main class="screen" id="s-drink">
   <div class="trophy" id="dr-em">🍻</div>
@@ -220,6 +240,7 @@ textarea{min-height:230px;resize:vertical}
 const $=s=>document.querySelector(s), rot=$('#rot');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const PAL=['#ff5a5f','#ffc93c','#2ec4a0','#9b7bff','#3fa7ff','#ff7eb6','#ff9a3c','#7bd33f'];
+const TC=['#ff5a5f','#3fa7ff','#2ec4a0','#ffc93c','#b18cff','#ff9a3c'];
 const C=(id,n,i,w,h='')=>({id,n,i,h,w:w.split('|')});
 const defs0=()=>({
  classic:[
@@ -241,7 +262,6 @@ const defs0=()=>({
 const defs=()=>{
   const d=defs0();
   d.drink=d.classic.map(c=>({...c,id:c.id.replace('cl-','dr-'),w:c.id==='cl-dif'?c.w.map(x=>x+'#1'):[...c.w]}));
-  d.drink.splice(5,0,C('dr-festa','Festa','🍻','Cervesa|Xupito|Brindis|Karaoke|Discoteca|Cubata|Ressaca#1|Beure a galet#1|Estar tocat#1|Ressopar|Barra lliure|Botellón'));
   return d;
 };
 const PUN=[{id:'dr-p1',n:'Beu tu',i:'🍺',w:[],pun:'self'},{id:'dr-p2',n:'Dona 2 glops',i:'🎁',w:[],pun:'give'},{id:'dr-p3',n:'Tothom beu',i:'🍻',w:[],pun:'all'}];
@@ -258,7 +278,11 @@ S.cfg=Object.assign({time:60,streak:3,sfx:true,music:true,goal:0,vm:60,vs:60,int
 if(!S.teams||S.teams.length<2)S.teams=['Equip 1','Equip 2'];
 if(S.cfg.maxs===10)S.cfg.maxs=6;
 if(!S.drink)S.drink=defs().drink;
+S.drink=S.drink.filter(c=>c.id!=='dr-festa');
+if(!S.mem)S.mem=[];
+S.dopt=Object.assign({forb:true,cards:true,fa:false,chal:true,off:[],pun:{}},S.dopt);
 if(!S.forb)S.forb={id:'forb',n:'Paraules prohibides',i:'🚫',h:'',w:[...FORB]};
+if(!S.mods)S.mods={id:'mods',n:'Reptes',i:'🎯',h:'',w:[...MODS]};
 if(!S.cards)S.cards={id:'cards',n:'Cartes sorpresa',i:'🃏',h:'',w:CARDS.split('|')};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const pool=()=>[...S.classic,...S.mime,...S.custom];
@@ -388,7 +412,7 @@ function ask(text,yes="D'acord",no='Cancel·lar'){
 let P,T=[],tt=0,streak=0,lastMsg='',tm=null,left=0,tdone=false;
 function prepare(cats,title,hint,back,drink){
   if(!cats.some(c=>c.w.length))return false;
-  P={cats,title,hint,back,drink}; $('#t-note').textContent=drink?'🥤 Pots jugar amb begudes sense alcohol. Beu amb moderació i només si vols.':''; renderTeams(); show('s-teams'); return true;
+  P={cats,title,hint,back,drink}; renderTeams(); show('s-teams'); return true;
 }
 const GOALS=[0,5,10,15,20];
 const goalChips=()=>GOALS.map(g=>`<button class="chip" data-g="${g}" aria-pressed="${S.cfg.goal===g}">${g||'Indefinit'}</button>`).join('');
@@ -397,22 +421,40 @@ $('#t-goal-n').oninput=e=>{const v=Math.min(999,parseInt(e.target.value));if(v>=
 $('#t-goal').onclick=e=>{const c=e.target.closest('[data-g]');if(c){S.cfg.goal=+c.dataset.g;save();renderGoal()}};
 function renderTeams(){
   renderGoal();
-  $('#t-list').innerHTML=S.teams.map((n,i)=>`<div class="row" style="flex-wrap:nowrap"><input data-i="${i}" value="${esc(n)}" maxlength="20" aria-label="Nom de l'equip ${i+1}">${S.teams.length>2?`<button class="chip" data-d="${i}" aria-label="Treure l'equip">✕</button>`:''}</div>`).join('');
+  $('#t-list').innerHTML=S.teams.map((n,i)=>`<div class="list" style="gap:6px"><div class="row" style="flex-wrap:nowrap"><input data-i="${i}" style="border-left:14px solid ${TC[i]}" value="${esc(n)}" maxlength="20" aria-label="Nom de l'equip ${i+1}">${S.teams.length>2?`<button class="chip" data-d="${i}" aria-label="Treure l'equip">✕</button>`:''}</div>${P.drink?`<input data-m="${i}" value="${esc(S.mem[i]||'')}" placeholder="Jugadors (separats per comes)" aria-label="Jugadors de l'equip ${i+1}">`:''}</div>`).join('');
+  $('#adv').style.display=P.drink?'':'none'; if(P.drink)renderAdv();
 }
-$('#t-list').oninput=e=>{const i=e.target.dataset.i;if(i!==undefined){S.teams[+i]=e.target.value;save()}};
-$('#t-list').onclick=e=>{const d=e.target.closest('[data-d]');if(d){S.teams.splice(+d.dataset.d,1);save();renderTeams()}};
-$('#t-add').onclick=()=>{if(S.teams.length<6){S.teams.push('Equip '+(S.teams.length+1));save();renderTeams()}};
+function renderAdv(){
+  const o=S.dopt, t=(k,l)=>`<button class="chip" data-o="${k}" aria-pressed="${o[k]}">${l}</button>`;
+  $('#adv-body').innerHTML='<h4>Normes</h4><div class="chips">'+t('forb','🚫 Paraula prohibida')+t('cards','🃏 Cartes sorpresa')+t('fa','🔥 Foc amic')+t('chal','🎯 Reptes')+'</div>'
+   +'<h4>Temes de la ruleta</h4><div class="chips">'+S.drink.map(c=>`<button class="chip" data-t="${c.id}" aria-pressed="${!o.off.includes(c.id)}">${esc(c.i)} ${esc(c.n)}</button>`).join('')+'<button class="chip" data-new="1">+ Nou tema</button></div>'
+   +'<h4>Caselles de càstig</h4><div class="chips">'+PUN.map(q=>`<button class="chip" data-p="${q.id}" aria-pressed="${o.pun[q.id]!==false}">${q.i} ${q.n}</button>`).join('')+'</div>';
+}
+$('#adv-body').onclick=e=>{
+  const c=e.target.closest('button'); if(!c)return; const d=c.dataset,o=S.dopt;
+  if(d.o)o[d.o]=!o[d.o];
+  else if(d.t){const k=o.off.indexOf(d.t);k<0?o.off.push(d.t):o.off.splice(k,1)}
+  else if(d.p)o.pun[d.p]=o.pun[d.p]===false;
+  else if(d.new)return openEditor(S.drink,null,()=>{renderTeams();show('s-teams')});
+  save(); renderAdv();
+};
+const drinkCats=()=>S.drink.filter(c=>!S.dopt.off.includes(c.id)).concat(PUN.filter(q=>S.dopt.pun[q.id]!==false));
+$('#t-list').oninput=e=>{const d=e.target.dataset;if(d.i!==undefined)S.teams[+d.i]=e.target.value;if(d.m!==undefined)S.mem[+d.m]=e.target.value;save()};
+$('#t-list').onclick=e=>{const d=e.target.closest('[data-d]');if(d){S.teams.splice(+d.dataset.d,1);S.mem.splice(+d.dataset.d,1);save();renderTeams()}};
+$('#t-add').onclick=()=>{if(S.teams.length<6){S.teams.push('Equip '+(S.teams.length+1));S.mem.push('');save();renderTeams()}};
 $('#t-back').onclick=()=>show(P.back);
 $('#t-go').onclick=()=>{
-  T=S.teams.map((n,i)=>({n:n.trim()||'Equip '+(i+1),s:0,dr:0,gv:0})); tt=Math.random()*T.length|0; streak=0;
-  lastMsg=`🎲 Comença ${T[tt].n}!`; play(P.cats,P.title,P.hint); G.drink=!!P.drink; board();
-  if(G.drink){newForb();forbScreen(()=>show('s-wheel'))} sfx('start');
+  T=S.teams.map((n,i)=>({n:n.trim()||'Equip '+(i+1),s:0,dr:0,gv:0,p:P.drink?(S.mem[i]||'').split(',').map(x=>x.trim()).filter(Boolean).slice(0,12).map(x=>({n:x,dr:0,gv:0})):[]})); tt=Math.random()*T.length|0; streak=0;
+  lastMsg=`🎲 Comença ${T[tt].n}!`; const cs=P.drink?drinkCats():P.cats;
+  if(!cs.some(c=>c.w.length)){ask("Tria almenys un tema amb paraules als ajustos avançats.","D'acord",null);return}
+  play(cs,P.title,P.hint); G.drink=!!P.drink; board();
+  if(G.drink&&S.dopt.forb){newForb();forbScreen(()=>show('s-wheel'))} sfx('start');
 };
 $('#g-back').onclick=()=>ask('Vols sortir de la partida? Es perdran els punts.','Sortir').then(y=>{if(y){stopTimer();show('s-home')}});
 function board(){
   forbLine();
-  $('#score').innerHTML=T.map((t,i)=>`<span class="tm${i===tt?' on':''}">${esc(t.n)} <b>${t.s}</b>${G.drink?` 🍺${t.dr} 🎁${t.gv}`:''}</span>`).join('');
-  $('#turn').innerHTML=`${esc(lastMsg)} Torn de <b>${esc(T[tt].n)}</b> (encerts seguits: ${streak}/${S.cfg.streak})${S.cfg.goal?` · Meta: ${S.cfg.goal} punts`:''}`;
+  $('#score').innerHTML=T.map((t,i)=>`<span class="tm${i===tt?' on':''}" style="background:${TC[i]}">${esc(t.n)} <b>${t.s}</b></span>`).join('')+(G.drink?'<span class="tm">📊 Glops</span>':'');
+  $('#turn').textContent=(streak?'✅'.repeat(streak)+' ':'')+streak+'/'+S.cfg.streak;
 }
 const nextTeam=()=>{tt=(tt+1)%T.length;streak=0};
 function verdict(r){
@@ -423,10 +465,10 @@ function verdict(r){
     if(streak>=S.cfg.streak){m=`✔ ${T[tt].n} ha fet ${streak} encerts seguits!`;nextTeam()}else m=`✔ +1 per a ${T[tt].n}!`;
   }else if(r===false||r===-1){
     sfx('bad');
-    if(dk){const n=cl(D.bet?D.bet*D.mult:(base()+D.wb)*D.mult);ev=r===-1?allD(n):selfD(tt,n)}
+    if(dk&&r===false&&D.bet)ev=selfD(tt,cl(D.bet*D.mult));
     m=r===-1?'Ningú l\'ha encertat.':`✘ ${T[tt].n} no l'ha encertada.`; nextTeam();
   }else{T[r].s++;
-    if(dk){const n=cl(D.bet?D.bet*D.mult:(base()+D.wb)*D.mult);T.forEach((t,i)=>{if(i!==r)t.dr+=n});T[r].gv+=n*(T.length-1);ev={e:'🎁',t:`${T[r].n} reparteix!`,x:`Els altres equips beuen ${gl(n)}.`}}
+    if(dk){const n=cl(D.bet?D.bet*D.mult:(base()+D.wb)*D.mult);ev=winD(r,n)}
     tt=r; streak=0; sfx('ok'); m=`🏆 ${T[r].n} guanya la paraula!`}
   const wn=T.find(t=>S.cfg.goal&&t.s>=S.cfg.goal);
   stopTimer();
@@ -434,15 +476,15 @@ function verdict(r){
     lastMsg=m; board(); $('#result').classList.remove('on');
     if(wn)return win(wn);
     const go=()=>afterTurn(()=>show('s-wheel'));
-    if(dk&&S.cards.w.length&&Math.random()<[.08,.15,.25][S.cfg.int])return drinkScreen('Carta sorpresa',S.cards.w[Math.random()*S.cards.w.length|0],go,'🃏');
+    if(dk&&S.dopt.cards&&S.cards.w.length&&Math.random()<[.08,.15,.25][S.cfg.int])return drinkScreen('Carta sorpresa',S.cards.w[Math.random()*S.cards.w.length|0],go,'🃏');
     go();
   };
-  if(dk&&ev)drinkScreen(ev.t,ev.x,fin,ev.e);else fin();
+  if(dk&&ev){if(ev.give)chooseTarget(ev.i,ev.n,fin);else drinkScreen(ev.t,ev.x,fin,ev.e)}else fin();
 }
 function win(w){
   $('#win-name').textContent=w.n;
-  $('#win-board').innerHTML=[...T].sort((a,b)=>b.s-a.s).map(t=>`<span class="tm${t===w?' on':''}">${esc(t.n)} <b>${t.s}</b></span>`).join('');
-  $('#win-drink').innerHTML=G.drink?'<span class="note" style="width:100%">🍻 Glops beguts i repartits</span>'+[...T].sort((a,b)=>b.dr-a.dr).map(t=>`<span class="tm">${esc(t.n)} 🍺${t.dr} 🎁${t.gv}</span>`).join(''):'';
+  $('#win-board').innerHTML=[...T].sort((a,b)=>b.s-a.s).map(t=>`<span class="tm${t===w?' on':''}" style="background:${TC[T.indexOf(t)]}">${esc(t.n)} <b>${t.s}</b></span>`).join('');
+  $('#win-drink').innerHTML=G.drink?'<span class="note" style="width:100%">🍻 Glops beguts i repartits</span>'+statsHtml([...T].sort((a,b)=>b.dr-a.dr)):'';
   show('s-win'); sfx('win'); confetti();
 }
 function confetti(){
@@ -474,9 +516,40 @@ let D={mult:1,bet:0,wb:0,seen:false,mod:'',forb:''};
 const base=()=>[1,1,2][S.cfg.int];
 const gl=n=>n+(n===1?' glop':' glops');
 const isAll=c=>/-tots$/.test(c.id);
-const selfD=(i,n)=>{T[i].dr+=n;return{e:'🍺',t:`${T[i].n} beu!`,x:gl(n)}};
-const give=(i,n)=>{T[i].gv+=n;if(T.length===2)T[1-i].dr+=n;return{e:'🎁',t:`${T[i].n} reparteix!`,x:`${gl(n)} als rivals`}};
-const allD=n=>{T.forEach(t=>t.dr+=n);return{e:'🍻',t:'Tothom beu!',x:`${gl(n)} cadascú`}};
+const rnd=a=>a[Math.random()*a.length|0];
+const nm=(i,p)=>p?`${p.n} (${T[i].n})`:T[i].n;
+function addD(i,p,n){T[i].dr+=n;if(p)p.dr+=n}
+function drinkP(i,n){const p=T[i].p.length?rnd(T[i].p):null;addD(i,p,n);return nm(i,p)}
+const selfD=(i,n)=>({e:'🍺',t:`${drinkP(i,n)} beu!`,x:gl(n)});
+function winD(r,n){
+  const names=[]; let cnt=0;
+  T.forEach((t,i)=>{if(i===r)return; if(t.p.length)t.p.forEach(q=>addD(i,q,n));else addD(i,null,n); names.push(t.n); cnt+=t.p.length||1});
+  T[r].gv+=n*cnt;
+  return{e:'🍻',t:`${T[r].n} guanya!`,x:`${names.join(' i ')} ${names.length>1?'beuen':'beu'} ${gl(n)} cadascú`};
+}
+const statsHtml=()=>{
+  const o=e=>e.p||T[e.i], es=entries().sort((a,b)=>o(b).dr-o(a).dr||o(b).gv-o(a).gv);
+  return '<div class="score" style="width:100%">'+T.map((t,i)=>`<span class="tm" style="background:${TC[i]}">${esc(t.n)} ⭐${t.s}</span>`).join('')+'</div>'
+   +es.map((e,k)=>`<div class="pr" style="background:${TC[e.i]}"><span class="pn">${k===0&&o(e).dr>0?'👑 ':''}${esc(e.n)}<small>${esc(T[e.i].n)}</small></span><span class="pv">🍺 ${o(e).dr}<small>🎁 ${o(e).gv}</small></span></div>`).join('');
+};
+$('#score').onclick=()=>{if(G&&G.drink){$('#st-body').innerHTML=statsHtml(T);show('s-stats')}};
+$('#st-back').onclick=()=>show('s-wheel');
+const give=(i,n)=>({give:1,i,n});
+function entries(){
+  const a=[]; T.forEach((t,i)=>{if(t.p.length)t.p.forEach(p=>a.push({i,p,n:p.n}));else a.push({i,p:null,n:t.n})}); return a;
+}
+function chooseTarget(i,n,after){
+  const gp=T[i].p.length?rnd(T[i].p):null, list=entries().filter(e=>S.dopt.fa||e.i!==i);
+  $('#gv-t').textContent=`${nm(i,gp)} dona ${gl(n)}`;
+  $('#gv-list').innerHTML=list.map((e,k)=>`<button class="pb" data-k="${k}" style="background:${TC[e.i]}"><b>${esc(e.n)}</b><small>${esc(T[e.i].n)}</small></button>`).join('');
+  $('#gv-list').onclick=x=>{
+    const b=x.target.closest('[data-k]'); if(!b)return; const e=list[+b.dataset.k];
+    T[i].gv+=n; if(gp)gp.gv+=n; addD(e.i,e.p,n);
+    drinkScreen(`${nm(e.i,e.p)} beu!`,gl(n),after,'🍺');
+  };
+  show('s-give'); sfx('start');
+}
+const allD=n=>{T.forEach((t,i)=>{if(t.p.length)t.p.forEach(q=>addD(i,q,n));else addD(i,null,n)});return{e:'🍻',t:'Tothom beu!',x:`${gl(n)} cadascú`}};
 function drinkScreen(t,x,after,e='🍻'){$('#dr-em').textContent=e;$('#dr-t').textContent=t;$('#dr-x').textContent=x;$('#dr-ok').onclick=after;sfx('drink');show('s-drink')}
 function punish(){
   const b=Math.min(S.cfg.maxs,base()),t=T[tt]; let ev;
@@ -484,10 +557,11 @@ function punish(){
   else if(cur.pun==='give')ev=give(tt,Math.min(S.cfg.maxs,2));
   else ev=allD(b);
   lastMsg=`${cur.i} ${cur.n}.`; nextTeam();
-  drinkScreen(ev.t,ev.x,()=>{board();$('#result').classList.remove('on');afterTurn(()=>show('s-wheel'))},ev.e);
+  const after=()=>{board();$('#result').classList.remove('on');afterTurn(()=>show('s-wheel'))};
+  if(ev.give)chooseTarget(ev.i,ev.n,after);else drinkScreen(ev.t,ev.x,after,ev.e);
 }
 function renderMod(){
-  $('#w-mod').textContent=[D.mod&&`🎯 Repte: ${D.mod} (glops ×2)`,D.bet&&`🎲 Aposta: ${gl(D.bet)}`,`🚫 Paraula prohibida: ${F.w}`].filter(Boolean).join('\n');
+  $('#w-mod').textContent=[D.mod&&`🎯 Repte: ${D.mod} (glops ×2)`,D.bet&&`🎲 Aposta: ${gl(D.bet)}`,S.dopt.forb&&`🚫 Paraula prohibida: ${F.w}`].filter(Boolean).join('\n');
 }
 function renderBet(){
   $('#bet').innerHTML=D.seen?'':'<span class="note" style="width:100%;text-align:center">'+(isAll(cur)?"🎲 Aposteu quants glops us jugueu (els equips que no l'encertin els beuen)":'🎲 Doble o res: aposta glops abans de veure la paraula')+'</span>'+[0,1,2,3].map(b=>`<button class="chip" data-b="${b}" aria-pressed="${D.bet===b}">${b?b+' glops':'Sense aposta'}</button>`).join('');
@@ -498,7 +572,7 @@ function newForb(){
   F={w,left:S.cfg.fn}; forbLine();
 }
 function forbLine(){
-  $('#fb').style.display=G&&G.drink?'flex':'none';
+  $('#fb').style.display=G&&G.drink&&S.dopt.forb?'flex':'none';
   $('#fb-t').textContent=`🚫 Paraula prohibida: ${F.w} (${F.left} ${F.left===1?'torn':'torns'})`;
 }
 function forbScreen(after){
@@ -507,7 +581,7 @@ function forbScreen(after){
 }
 function chalScreen(after){$('#ch-x').textContent=D.mod;$('#ch-ok').onclick=after;sfx('alarm');show('s-chal')}
 function afterTurn(next){
-  if(!G.drink)return next();
+  if(!G.drink||!S.dopt.forb)return next();
   if(--F.left<=0){newForb();return forbScreen(next)}
   forbLine(); next();
 }
@@ -519,17 +593,18 @@ $('#go').onclick=()=>{
   const col=PAL[curK%PAL.length],card=$('#card'),all=isAll(cur),dk=G.drink,mt=String(word).match(/^(.*?)\s*#(\d+)$/);
   D={mult:1,bet:0,wb:mt?+mt[2]:0,seen:false,mod:'',forb:''};
   if(dk){
-    if(Math.random()<[.12,.2,.35][S.cfg.int]){D.mod=MODS[Math.random()*MODS.length|0];D.mult=2}
+    if(S.dopt.chal&&S.mods.w.length&&Math.random()<[.12,.2,.35][S.cfg.int]){D.mod=rnd(S.mods.w);D.mult=2}
   }
   card.classList.remove('shown'); card.style.setProperty('--c',col);
   $('#w-badge').textContent=cur.i+' '+cur.n; $('#w-badge').style.setProperty('--c',col);
   $('#w-hint').textContent=[all?'':`Dibuixa ${T[tt].n}.`,G.hint,cur.h].filter(Boolean).join(' ');
   $('#word').textContent=mt?mt[1]:word; stopTimer(); $('#t-start').textContent=`⏱ Començar ${S.cfg.time} s`; syncT();
-  $('#dk').style.display=dk?'flex':'none'; if(dk){renderMod();renderBet()}
+  $('#dk').style.display=dk?'flex':'none'; if(dk){renderMod();renderBet();$('#w-forb').style.display=S.dopt.forb?'':'none'}
   $('#vd').innerHTML=all
     ?'<span class="note" style="width:100%">Quin equip l\'ha encertat?</span>'+T.map((t,i)=>`<button class="btn sm" data-v="${i}">${esc(t.n)}</button>`).join('')+'<button class="btn sm ghost" data-v="-1">Cap</button>'
     :'<button class="v n" data-v="n" aria-label="Incorrecte">✘</button><button class="v y" data-v="y" aria-label="Correcte">✔</button>';
-  if(dk&&D.mod)chalScreen(()=>show('s-word'));else show('s-word');
+  const tw=()=>show('s-word');
+  if(dk&&D.mod)chalScreen(tw);else tw();
 };
 $('#card').onclick=()=>{const card=$('#card');card.classList.toggle('shown');if(card.classList.contains('shown')&&G.drink&&!D.seen){D.seen=true;renderBet()}sfx(card.classList.contains('shown')?'reveal':'hide');syncT()};
 $('#vd').onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;const v=b.dataset.v;verdict(v==='y'?true:v==='n'?false:+v)};
@@ -542,7 +617,7 @@ function openEditor(arr,idx,back){
   E={arr,idx,back}; const c=idx==null?{n:'',i:'',w:[]}:arr[idx];
   $('#e-title').textContent=idx==null?'Nova temàtica':'Editar temàtica';
   $('#e-name').value=c.n; $('#e-emoji').value=c.i; $('#e-words').value=c.w.join('\n');
-  $('#e-del').style.display=idx==null||arr[idx]===S.cards||arr[idx]===S.forb?'none':''; countW(); show('s-edit');
+  $('#e-del').style.display=idx==null||arr[idx]===S.cards||arr[idx]===S.forb||arr[idx]===S.mods?'none':''; countW(); show('s-edit');
 }
 $('#e-words').oninput=countW;
 $('#e-save').onclick=()=>{
@@ -571,11 +646,12 @@ function renderSet(){
     b.innerHTML=`<label class="setrow">Temps del temporitzador (s)<input type="number" inputmode="numeric" min="10" max="600" step="5" data-k="time" value="${S.cfg.time}"></label><label class="setrow">Encerts seguits per canviar d'equip<input type="number" inputmode="numeric" min="1" max="10" data-k="streak" value="${S.cfg.streak}"></label><label class="setrow">🎵 Volum de la música<input type="range" min="0" max="100" data-v="vm" value="${S.cfg.vm}"></label><label class="setrow">🔊 Volum dels sons<input type="range" min="0" max="100" data-v="vs" value="${S.cfg.vs}"></label><label class="setrow">🚫 Torns amb la mateixa paraula prohibida<input type="number" inputmode="numeric" min="1" max="20" data-k="fn" value="${S.cfg.fn}"></label><label class="setrow">🍺 Màxim de glops per torn<input type="number" inputmode="numeric" min="1" max="30" data-k="maxs" value="${S.cfg.maxs}"></label><div class="chips"><span class="note" style="width:100%;text-align:left">Intensitat del mode Beure</span>${['Suau','Normal','Picant'].map((n,i)=>`<button class="chip" data-n="${i}" aria-pressed="${S.cfg.int===i}">${n}</button>`).join('')}</div><div class="chips"><button class="chip" data-c="sfx" aria-pressed="${S.cfg.sfx}">🔊 Efectes</button><button class="chip" data-c="music" aria-pressed="${S.cfg.music}">🎵 Música</button></div>`;
     return;
   }
-  if(setMode==='drink')b.innerHTML='<p class="note">Afegeix #2 al final d\'una paraula perquè valgui glops extra.</p><button class="btn sm ghost" id="cards-btn">🃏 Cartes sorpresa</button><button class="btn sm ghost" id="forb-btn">🚫 Paraules prohibides</button>';
+  if(setMode==='drink')b.innerHTML='<p class="note">Afegeix #2 al final d\'una paraula perquè valgui glops extra.</p><button class="btn sm ghost" id="cards-btn">🃏 Cartes sorpresa</button><button class="btn sm ghost" id="forb-btn">🚫 Paraules prohibides</button><button class="btn sm ghost" id="mods-btn">🎯 Reptes</button>';
   if(setMode==='custom')b.innerHTML='<p class="note">Aquí hi ha les temàtiques que has creat. Les dels altres modes les tries dins de Personalitzat.</p>';
   catList(b,S[setMode],backSet);
   const cb=$('#cards-btn'); if(cb)cb.onclick=()=>openEditor([S.cards],0,backSet);
   const fb=$('#forb-btn'); if(fb)fb.onclick=()=>openEditor([S.forb],0,backSet);
+  const mb=$('#mods-btn'); if(mb)mb.onclick=()=>openEditor([S.mods],0,backSet);
   if(setMode!=='custom'){
     const r=document.createElement('button'); r.className='btn sm ghost'; r.textContent='Restaurar valors per defecte';
     r.onclick=()=>ask('Es perdran els canvis d\'aquest mode. Continuar?','Restaurar').then(y=>{if(y){S[setMode]=defs()[setMode];save();renderSet()}});
