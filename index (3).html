@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f3f6fa">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pictionary">
+<title>Pictionary</title>
+<style>
+:root{--bg:#f3f6fa;--ink:#1b2340;--mute:#5d6685;--white:#fff}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:ui-rounded,"Arial Rounded MT Bold","Segoe UI",system-ui,sans-serif;display:flex;padding:calc(12px + env(safe-area-inset-top)) 16px calc(12px + env(safe-area-inset-bottom));overflow-y:auto}
+.screen{display:none;width:100%;max-width:420px;flex-direction:column;align-items:center;gap:16px;text-align:center;margin:auto;padding:6px 0}
+.screen.on{display:flex}
+h1{font-size:36px;font-weight:900;letter-spacing:-.5px}
+h2{font-size:24px;font-weight:900}
+h3{font-size:18px;width:100%;text-align:left;margin-top:6px}
+h4{font-size:14px;color:var(--mute);width:100%;text-align:left;margin:8px 0 6px}
+.sub,.note{color:var(--mute);font-size:15px}
+.btn{font:inherit;font-weight:800;font-size:20px;color:var(--ink);background:#ffc93c;border:3px solid var(--ink);border-radius:16px;padding:14px 34px;box-shadow:0 5px 0 var(--ink);cursor:pointer;transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn.sm{font-size:16px;padding:9px 18px;border-radius:14px;box-shadow:0 4px 0 var(--ink)}
+.ghost{background:#fff}.danger{background:#ff5a5f}
+:focus-visible{outline:3px solid #3fa7ff;outline-offset:3px}
+.top{display:flex;align-items:center;gap:14px;width:100%}
+.row{display:flex;gap:10px;width:100%;justify-content:center;flex-wrap:wrap}
+.list{display:flex;flex-direction:column;gap:10px;width:100%}
+input,textarea{font:inherit;width:100%;border:3px solid var(--ink);border-radius:14px;padding:10px 14px;background:#fff;color:var(--ink)}
+textarea{min-height:230px;resize:vertical}
+
+/* Menú */
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%}
+.mode{font:inherit;color:var(--ink);background:var(--c);border:3px solid var(--ink);border-radius:22px;box-shadow:0 6px 0 var(--ink);min-height:140px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.mode:active{transform:translateY(5px);box-shadow:0 1px 0 var(--ink)}
+.mode:disabled{opacity:.55;pointer-events:none}
+.mode .mi{font-size:38px}.mode b{font-size:20px}.mode small{font-size:13px;line-height:1.2}
+
+/* Llistes i xips */
+.item{font:inherit;color:var(--ink);display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;font-weight:800;background:#fff;border:3px solid var(--ink);border-radius:14px;padding:12px 14px;cursor:pointer}
+.item small{color:var(--mute);font-weight:700;white-space:nowrap}
+.chips,.mine{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-start;width:100%}
+.chip{font:inherit;font-weight:700;font-size:15px;border:2.5px solid var(--ink);border-radius:999px;padding:6px 14px;background:#fff;color:var(--ink);cursor:pointer}
+.chip[aria-pressed=true]{background:#ffc93c}
+.chip[aria-pressed=true]::before{content:"✓ "}
+
+/* Ruleta */
+.wheel{position:relative;width:min(86vw,340px);aspect-ratio:1;margin-top:10px}
+.wheel svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 6px 0 var(--ink))}
+#rot{transform-origin:0 0;transition:transform 4.5s cubic-bezier(.12,.62,.1,1)}
+.pointer{position:absolute;left:50%;top:-14px;width:0;height:0;transform:translateX(-50%);border-left:15px solid transparent;border-right:15px solid transparent;border-top:28px solid var(--ink);z-index:2}
+#result{display:none;flex-direction:column;align-items:center;gap:10px;min-height:96px}
+#result.on{display:flex}
+.pill,.badge{display:inline-flex;align-items:center;gap:10px;font-weight:900;font-size:22px;padding:8px 20px;border:3px solid var(--ink);border-radius:999px;background:var(--c,#fff)}
+
+/* Revelar */
+.hint{font-size:15px;color:var(--mute);min-height:20px;margin-top:-6px}
+.card{width:100%;min-height:290px;border:3px solid var(--ink);border-radius:28px;background:var(--white);box-shadow:0 8px 0 var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;cursor:pointer;user-select:none;font:inherit;color:inherit;transition:background .2s}
+.card .big{font-size:64px;line-height:1}
+.card .word{font-size:clamp(34px,10vw,48px);font-weight:900;line-height:1.1;overflow-wrap:anywhere}
+.card .tap{font-size:18px;font-weight:800}
+.card .tiny{font-size:14px;color:var(--mute)}
+.card.shown{background:var(--c)}
+.card .a,.card .b{display:flex;flex-direction:column;align-items:center;gap:12px}
+.card .b,.card.shown .a{display:none}
+.card.shown .b{display:flex}
+#next{visibility:hidden}#next.on{visibility:visible}
+@media (prefers-reduced-motion:reduce){#rot{transition-duration:.01s}}
+@media (max-height:640px){.wheel{width:min(70vw,280px)}.card{min-height:220px}}
+.mute{position:fixed;top:calc(10px + env(safe-area-inset-top));right:12px;z-index:9;width:44px;height:44px;border-radius:50%;border:3px solid var(--ink);background:#fff;font-size:20px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
+.score{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%}
+.tm{border:2.5px solid var(--ink);border-radius:999px;padding:4px 12px;background:#fff;font-weight:700;font-size:15px}
+.tm.on{background:#ffc93c}
+.timer{font-size:30px;font-weight:900;min-width:96px;font-variant-numeric:tabular-nums}.timer.urgent{color:#e63946}
+.vd{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;width:100%}
+.v{font:inherit;font-size:34px;width:96px;height:76px;border:3px solid var(--ink);border-radius:20px;box-shadow:0 5px 0 var(--ink);cursor:pointer;color:var(--ink)}
+.v:active{transform:translateY(4px);box-shadow:0 1px 0 var(--ink)}
+.v.y{background:#2ec4a0}.v.n{background:#ff5a5f}
+.setrow{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;font-weight:800;text-align:left}
+.setrow input{width:96px;text-align:center}
+.modal{position:fixed;inset:0;background:rgba(27,35,64,.55);display:flex;align-items:center;justify-content:center;z-index:20;padding:20px}
+.modal[hidden]{display:none}
+.mbox{background:#fff;border:3px solid var(--ink);border-radius:22px;box-shadow:0 6px 0 var(--ink);padding:22px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:16px;text-align:center;font-weight:800}
+.trophy{font-size:96px;line-height:1;animation:pop 1s ease-in-out infinite alternate}
+@keyframes pop{to{transform:scale(1.15) rotate(6deg)}}
+.cf{position:fixed;top:-30px;font-size:26px;pointer-events:none;z-index:15;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.trophy{animation:none}}
+.setrow input[type=range]{width:150px;padding:0;border:0;background:none;accent-color:#1b2340}
+.dk{display:none;flex-direction:column;gap:8px;align-items:center;width:100%}
+.mod{font-weight:800;font-size:15px;line-height:1.4;white-space:pre-line}
+.full{position:fixed;inset:0;max-width:none;margin:0;padding:24px;justify-content:center;background:var(--fc);z-index:8;overflow-y:auto}
+.full h1{font-size:clamp(30px,9vw,46px)}
+.full .btn{background:#fff}
+.bigw{font-size:clamp(64px,26vw,150px);font-weight:900;line-height:1;overflow-wrap:anywhere}
+.logo{width:min(56vw,220px);height:auto;border:3px solid var(--ink);border-radius:26px;box-shadow:0 6px 0 var(--ink)}
+</style>
+</head>
+<body>
+
+<main class="screen on" id="s-home">
+  <img class="logo" src="logo.png" alt="Pictionary" width="220" height="220">
+  <p class="sub">Tria un mode de joc</p>
+  <div class="menu" id="menu"></div>
+  <button class="btn sm ghost" id="open-set">⚙️ Ajustos</button>
+</main>
+
+<main class="screen" id="s-wheel">
+  <div class="top"><button class="btn sm ghost" id="g-back" aria-label="Tornar als modes">←</button><h2 id="g-title"></h2></div>
+  <div class="score" id="score"></div>
+  <p class="note" id="turn" aria-live="polite"></p>
+  <div class="dk" id="fb"><span class="mod" id="fb-t"></span><button class="chip" id="fb-btn">🚫 L'han dit!</button></div>
+  <div class="wheel">
+    <div class="pointer"></div>
+    <svg viewBox="-110 -110 220 220" role="img" aria-label="Ruleta de temàtiques"><g id="rot"></g><circle r="17" fill="#fff" stroke="#1b2340" stroke-width="4"/></svg>
+  </div>
+  <button class="btn" id="spin">Gira!</button>
+  <div id="result" aria-live="polite">
+    <span class="pill" id="r-pill"></span>
+    <button class="btn" id="go">Veure la paraula</button>
+    <span class="note">Que no et vegi ningú la pantalla!</span>
+  </div>
+</main>
+
+<main class="screen" id="s-word">
+  <span class="badge" id="w-badge"></span>
+  <p class="hint" id="w-hint"></p>
+  <div class="dk" id="dk"><div class="mod" id="w-mod"></div><div class="chips" id="bet" style="justify-content:center"></div><button class="chip" id="w-forb">🚫 L'han dit! Beu qui l'ha dit</button></div>
+  <button class="card" id="card" aria-label="Revelar o amagar la paraula">
+    <div class="a"><span class="big">🙈</span><span class="tap">Toca per veure la paraula</span></div>
+    <div class="b"><span class="word" id="word"></span><span class="tiny">Toca per amagar-la</span></div>
+  </button>
+  <div class="row"><button class="btn sm" id="t-start">⏱ Començar</button><span class="timer" id="timer" aria-live="polite"></span></div>
+  <div class="vd" id="vd"></div>
+</main>
+
+<main class="screen" id="s-set">
+  <div class="top"><button class="btn sm ghost" data-go="s-home" aria-label="Tornar">←</button><h2>Ajustos</h2></div>
+  <div class="chips" id="tabs"></div>
+  <div class="list" id="set-body"></div>
+</main>
+
+<main class="screen" id="s-edit">
+  <h2 id="e-title"></h2>
+  <input id="e-name" placeholder="Nom de la temàtica" maxlength="30">
+  <input id="e-emoji" placeholder="Emoji (opcional)" maxlength="4">
+  <textarea id="e-words" placeholder="Una paraula per línia (mode Beure: afegeix #2 al final per valer més glops)"></textarea>
+  <p class="note" id="e-count"></p>
+  <div class="row">
+    <button class="btn sm" id="e-save">Guardar</button>
+    <button class="btn sm danger" id="e-del">Esborrar</button>
+    <button class="btn sm ghost" id="e-cancel">Cancel·lar</button>
+  </div>
+</main>
+
+<main class="screen" id="s-custom">
+  <div class="top"><button class="btn sm ghost" data-go="s-home" aria-label="Tornar">←</button><h2>Personalitzat</h2></div>
+  <h3>Temàtiques existents</h3>
+  <div id="c-exist" style="width:100%"></div>
+  <h3>Les meves temàtiques</h3>
+  <div class="mine" id="c-mine"></div>
+  <button class="btn sm" id="c-new">+ Nova temàtica</button>
+  <h3>Partides guardades</h3>
+  <div class="list" id="c-saves"></div>
+  <div class="row"><input id="c-name" placeholder="Nom de la partida"><button class="btn sm" id="c-save">Guardar partida</button></div>
+  <p class="note" id="c-msg" aria-live="polite"></p>
+  <button class="btn" id="c-play">Jugar</button>
+</main>
+
+<main class="screen" id="s-teams">
+  <div class="top"><button class="btn sm ghost" id="t-back" aria-label="Tornar">←</button><h2>Equips</h2></div>
+  <p class="sub">Posa nom als equips (mínim 2, màxim 6)</p>
+  <p class="note" id="t-note"></p>
+  <div class="list" id="t-list"></div>
+  <button class="btn sm ghost" id="t-add">+ Afegir equip</button>
+  <h3>Punts per guanyar</h3>
+  <div class="chips" id="t-goal"></div>
+  <input type="number" id="t-goal-n" inputmode="numeric" min="1" max="999" placeholder="Altres punts (ex.: 7)" aria-label="Punts personalitzats per guanyar">
+  <button class="btn" id="t-go">Començar</button>
+</main>
+<main class="screen full" id="s-forb" style="--fc:#ff5a5f">
+  <div class="trophy">🚫</div>
+  <h1>Paraula prohibida!</h1>
+  <div class="bigw" id="fw"></div>
+  <h2 id="fw-n"></h2>
+  <button class="btn" id="fw-ok">Entesos</button>
+</main>
+<main class="screen full" id="s-chal" style="--fc:#9b7bff">
+  <div class="trophy">🎯</div>
+  <h1>Repte!</h1>
+  <h2 id="ch-x" style="font-size:clamp(26px,8vw,40px)"></h2>
+  <p class="note" style="color:var(--ink)">Els glops d'aquest torn es dupliquen (×2)</p>
+  <button class="btn" id="ch-ok">Acceptar el repte</button>
+</main>
+<main class="screen" id="s-drink">
+  <div class="trophy" id="dr-em">🍻</div>
+  <h1 id="dr-t"></h1>
+  <h2 id="dr-x"></h2>
+  <button class="btn" id="dr-ok">Fet</button>
+</main>
+<main class="screen" id="s-win">
+  <div class="trophy">🏆</div>
+  <h1>Victòria!</h1>
+  <h2 id="win-name"></h2>
+  <div class="score" id="win-board"></div>
+  <div class="score" id="win-drink"></div>
+  <button class="btn" id="win-again">Tornar a jugar</button>
+  <button class="btn sm ghost" id="win-home">Menú principal</button>
+</main>
+<div class="modal" id="modal" hidden role="dialog" aria-modal="true"><div class="mbox"><p id="m-text"></p><div class="row"><button class="btn sm ghost" id="m-no">Cancel·lar</button><button class="btn sm" id="m-ok">D'acord</button></div></div></div>
+<button class="mute" id="mute" aria-label="Activar o silenciar el so">🔊</button>
+
+<script>
+const $=s=>document.querySelector(s), rot=$('#rot');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PAL=['#ff5a5f','#ffc93c','#2ec4a0','#9b7bff','#3fa7ff','#ff7eb6','#ff9a3c','#7bd33f'];
+const C=(id,n,i,w,h='')=>({id,n,i,h,w:w.split('|')});
+const defs0=()=>({
+ classic:[
+  C('cl-peli','Pel·lícules / Sèries','🎬','Titanic|El Rei Lleó|Harry Potter|Joc de Trons|Shrek|Els Increïbles|Stranger Things|La Casa de Paper|Buscant en Nemo|Jurassic Park|Matrix|Friends|Toy Story|Spider-Man|Frozen'),
+  C('cl-obj','Objecte','📦','Paraigua|Bicicleta|Tisores|Guitarra|Cadira|Bombeta|Rellotge|Ulleres|Maleta|Escala|Globus|Telèfon|Clau|Mirall|Cafetera'),
+  C('cl-acc','Acció','🏃','Dormir|Ballar|Pescar|Nedar|Cuinar|Esternudar|Pentinar-se|Conduir|Plorar|Escalar|Fer surf|Rentar-se les dents|Aplaudir|Llegir|Fer una foto'),
+  C('cl-dif','Dificultat','🔥','Democràcia|Nostàlgia|Gravetat|Internet|Electricitat|Eclipsi|Idea|Silenci|Llibertat|Vergonya|Temps|Ressaca|Cultura|Enveja|Infinit','Paraula difícil. Sort!'),
+  C('cl-pll','Persona / Lloc / Animal','🌍','Pirata|Torre Eiffel|Girafa|Astronauta|Sagrada Família|Pingüí|Bomber|Piràmides|Cangur|Platja|Dofí|Hospital|Messi|Mercat|Drac'),
+  C('cl-tots','Tots juguen','👥','Terratrèmol|Castell humà|Futbol|Selva|Nadal|Festa major|Carnaval|Circ|Volcà|Ciutat|Espai|Muntanya russa|Concert|Pluja|Aeroport','Tots els equips dibuixen alhora!')],
+ mime:[
+  C('mi-peli','Pel·lícules / Sèries','🎬','Titanic|King Kong|Rocky|Karate Kid|Mr. Bean|Pirates del Carib|Spider-Man|Shrek|Harry Potter|Mary Poppins|Forrest Gump|Buscant en Nemo|Matrix|El Rei Lleó|Tauró|Superman'),
+  C('mi-obj','Objecte','📦','Paraigua|Tisores|Guitarra|Telèfon|Ulleres|Escombra|Raqueta|Cafetera|Martell|Assecador|Moto|Càmera de fotos|Aspirador|Gronxador'),
+  C('mi-acc','Acció','🏃','Dormir|Ballar|Pescar|Nedar|Cuinar|Esternudar|Conduir|Plorar|Escalar|Aplaudir|Fer surf|Rentar els plats|Pintar una paret|Anar a cavall|Tocar el piano'),
+  C('mi-dif','Dificultat','🔥','Estar enamorat|Tenir por|Tenir calor|Estar marejat|Estar sorprès|Avorrir-se|Tenir son|Sentir vergonya|Estar nerviós|Tenir molta gana|Estar enfadat|Fer-se el despistat|Ser un fantasma|Estar atrapat','Paraula difícil, però es pot fer amb gestos!'),
+  C('mi-pa','Persona / Animal','🐾','Futbolista|Cambrer|Policia|Gos|Elefant|Mico|Gallina|Cangur|Bomber|Dentista|Pallasso|Boxejador|Serp|Pingüí'),
+  C('mi-esp','Esports','⚽','Tennis|Boxa|Natació|Esquí|Golf|Bàsquet|Ping-pong|Surf|Ciclisme|Escalada|Halterofília|Karate')]
+});
+
+const defs=()=>{
+  const d=defs0();
+  d.drink=d.classic.map(c=>({...c,id:c.id.replace('cl-','dr-'),w:c.id==='cl-dif'?c.w.map(x=>x+'#1'):[...c.w]}));
+  d.drink.splice(5,0,C('dr-festa','Festa','🍻','Cervesa|Xupito|Brindis|Karaoke|Discoteca|Cubata|Ressaca#1|Beure a galet#1|Estar tocat#1|Ressopar|Barra lliure|Botellón'));
+  return d;
+};
+const PUN=[{id:'dr-p1',n:'Beu tu',i:'🍺',w:[],pun:'self'},{id:'dr-p2',n:'Dona 2 glops',i:'🎁',w:[],pun:'give'},{id:'dr-p3',n:'Tothom beu',i:'🍻',w:[],pun:'all'}];
+const MODS=["Dibuixa amb la mà no dominant","Dibuixa amb els ulls tancats","Dibuixa sense aixecar el llapis del paper","L'equip no pot veure el dibuix fins que s'acabi el temps"];
+const FORB=['Sí','No','Vinga','Això','Mira','Doncs','Ja','Ostres','Clar','Però','Va','Bé'];
+let F={w:'',left:0};
+const CARDS="Qui porta mitjons de colors beu un glop|L'últim que es toqui el nas beu|Qui hagi dormit menys aquesta nit beu|Tothom qui porti ulleres beu un glop|Qui tingui menys bateria al mòbil beu|El més jove beu un glop|El més alt reparteix 2 glops|Qui porti alguna cosa vermella beu|Brindeu tots junts i beveu un glop|Qui dugui rellotge reparteix 2 glops|Qui hagi arribat l'últim a la partida beu|Qui tingui el cabell més llarg reparteix 2 glops";
+
+/* ---------- Dades (guardades al navegador) ---------- */
+const KEY='pictionary-v1';
+let S; try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.classic||!S.mime)S={...defs(),custom:[],sel:[],saves:[]};
+S.cfg=Object.assign({time:60,streak:3,sfx:true,music:true,goal:0,vm:60,vs:60,int:1,maxs:6,fn:5},S.cfg);
+if(!S.teams||S.teams.length<2)S.teams=['Equip 1','Equip 2'];
+if(S.cfg.maxs===10)S.cfg.maxs=6;
+if(!S.drink)S.drink=defs().drink;
+if(!S.forb)S.forb={id:'forb',n:'Paraules prohibides',i:'🚫',h:'',w:[...FORB]};
+if(!S.cards)S.cards={id:'cards',n:'Cartes sorpresa',i:'🃏',h:'',w:CARDS.split('|')};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const pool=()=>[...S.classic,...S.mime,...S.custom];
+const clone=o=>JSON.parse(JSON.stringify(o));
+const NAMES={general:'General',classic:'Clàssic',custom:'Personalitzat',mime:'Mímica',drink:'Beure'};
+const MODES=[
+ {id:'classic',i:'🎨',d:'La ruleta de sempre',c:'#ffc93c'},
+ {id:'custom',i:'🛠️',d:'Tria o crea temàtiques',c:'#3fa7ff'},
+ {id:'mime',i:'🎭',d:'Paraules per fer amb gestos',c:'#ff7eb6'},
+ {id:'drink',i:'🍻',d:'Dibuixa i beu!',c:'#ffb347'}];
+
+const show=id=>document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)show(g.dataset.go)});
+
+/* ---------- So i música (sintetitzats, sense fitxers) ---------- */
+let AC,mt=null,ms=0,started=false;
+const ctx=()=>AC||(AC=new(window.AudioContext||window.webkitAudioContext)());
+let vol=1;
+const lv=x=>(x/60)**2;
+function tone(f,d,type='square',v=.1,t=0){v*=vol;if(v<=0)return;const a=ctx(),o=a.createOscillator(),g=a.createGain(),s=a.currentTime+t;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,s);g.gain.exponentialRampToValueAtTime(.001,s+d);o.connect(g);g.connect(a.destination);o.start(s);o.stop(s+d+.05)}
+const mid=n=>440*2**((n-69)/12);
+const seq=(fs,d,type,v,gap)=>fs.forEach((f,i)=>tone(f,d,type,v,i*gap));
+const SFX={
+  click:()=>tone(900,.05,'square',.07),
+  spinTick:()=>tone(1400,.03,'square',.05),
+  stop:()=>seq([392,523,659],.18,'triangle',.2,.09),
+  reveal:()=>seq([523,659,784,1047],.15,'triangle',.18,.07),
+  hide:()=>seq([500,350],.1,'triangle',.15,.07),
+  start:()=>seq([440,660],.12,'square',.1,.08),
+  tick:()=>tone(1200,.05,'square',.07),
+  alarm:()=>[0,.25,.5].forEach(t=>tone(880,.18,'square',.13,t)),
+  win:()=>seq([523,659,784,1047,784,1047,1319],.22,'square',.1,.12),
+  drink:()=>seq([330,277,220],.14,'sine',.2,.09),
+  ok:()=>seq([523,659,784,1047],.2,'square',.1,.08),
+  bad:()=>{tone(220,.25,'sawtooth',.12);tone(165,.35,'sawtooth',.12,.2)}
+};
+const sfx=n=>{if(S.cfg.sfx)try{vol=lv(S.cfg.vs);SFX[n]()}catch(e){}};
+const CH=[[60,4,7],[57,3,7],[53,4,7],[55,4,7]];
+function mstep(){
+  if(!S.cfg.music||!AC)return;
+  vol=lv(S.cfg.vm);
+  const c=CH[(ms>>3)&3],i=ms&7,o=[0,1,2,1,2,1,2,1][i];
+  tone(mid(c[0]+12+(o?c[o]:0)+(i===3||i===7?12:0)),.18,'square',.04,.02);
+  if(i===0||i===4)tone(mid(c[0]-24),.35,'triangle',.12,.02);
+  ms++;
+}
+function applyAudio(){
+  $('#mute').textContent=(S.cfg.sfx||S.cfg.music)?'🔊':'🔇';
+  if(!started)return;
+  if(S.cfg.music&&!document.hidden){if(!mt){ctx().resume();mt=setInterval(mstep,200)}}else{clearInterval(mt);mt=null}
+}
+document.addEventListener('pointerdown',()=>{if(!started){started=true;ctx().resume();applyAudio()}});
+document.addEventListener('visibilitychange',applyAudio);
+document.addEventListener('click',e=>{if(e.target.closest('button'))sfx('click')});
+$('#mute').onclick=()=>{const on=!(S.cfg.sfx||S.cfg.music);S.cfg.sfx=S.cfg.music=on;save();applyAudio();sfx('click')};
+applyAudio();
+
+/* ---------- Inici ---------- */
+$('#menu').innerHTML=MODES.map(m=>`<button class="mode" data-m="${m.id}" style="--c:${m.c}"${m.off?' disabled':''}><span class="mi">${m.i}</span><b>${NAMES[m.id]}</b><small>${m.d}</small></button>`).join('');
+$('#menu').onclick=e=>{
+  const b=e.target.closest('[data-m]'); if(!b)return; const m=b.dataset.m;
+  if(m==='classic'||m==='mime'||m==='drink'){
+    if(!prepare(m==='drink'?S.drink.concat(PUN):S[m],NAMES[m],m==='mime'?'Sense parlar ni fer sons!':'','s-home',m==='drink'))ask('Aquest mode no té paraules. Afegeix-ne als ajustos.',"D'acord",null);
+  }else if(m==='custom'){renderCustom();msg('');show('s-custom')}
+};
+$('#open-set').onclick=()=>{renderSet();show('s-set')};
+
+/* ---------- Joc ---------- */
+const pt=(r,a)=>[(r*Math.sin(a*Math.PI/180)).toFixed(2),(-r*Math.cos(a*Math.PI/180)).toFixed(2)];
+function wrap(t,m){
+  let a='',b='';
+  for(const x of t.split(/\s+/)){const u=(a+' '+x).trim();if(!b&&u.length<=m)a=u;else if(!a)a=x.slice(0,m-1)+'…';else b=(b+' '+x).trim()}
+  return [a,b.length>m?b.slice(0,m-1)+'…':b].filter(Boolean);
+}
+let G,angle=0,busy=false,cur,curK,word,used=new Set();
+function play(cats,title,hint){
+  let cs=cats.filter(c=>c.w.length||c.pun);
+  if(!cs.length)return false;
+  while(cs.length<3)cs=cs.concat(cs);
+  G={cs,hint:hint||'',SEG:360/cs.length}; used=new Set(); busy=false; angle=0;
+  $('#g-title').textContent=title; $('#result').classList.remove('on'); $('#spin').disabled=false;
+  drawWheel(); show('s-wheel'); return true;
+}
+function drawWheel(){
+  const N=G.cs.length,SEG=G.SEG,big=N>8,txt=N<=10;
+  rot.style.transition='none'; rot.style.transform='rotate(0deg)'; rot.innerHTML='';
+  G.cs.forEach((c,k)=>{
+    const [x1,y1]=pt(105,k*SEG-SEG/2),[x2,y2]=pt(105,k*SEG+SEG/2);
+    const t=txt?wrap(c.n,big?8:11).map((l,j)=>`<text y="${(big?-62:-52)+j*(big?8:10)}" font-size="${big?6.5:8.5}" font-weight="800" text-anchor="middle" fill="#1b2340">${esc(l)}</text>`).join(''):'';
+    rot.insertAdjacentHTML('beforeend',
+      `<path d="M0 0L${x1} ${y1}A105 105 0 0 1 ${x2} ${y2}Z" fill="${PAL[k%PAL.length]}" stroke="#1b2340" stroke-width="3" stroke-linejoin="round"/>`+
+      `<g transform="rotate(${k*SEG})"><text y="${txt?(big?-74:-72):-70}" font-size="${txt?(big?15:22):20}" text-anchor="middle">${esc(c.i)}</text>${t}</g>`);
+  });
+  void rot.getBoundingClientRect(); rot.style.transition='';
+}
+const pick=c=>{
+  let p=c.w.filter(w=>!used.has(c.id+w));
+  if(!p.length){c.w.forEach(w=>used.delete(c.id+w));p=c.w}
+  const w=p[Math.random()*p.length|0]; used.add(c.id+w); return w;
+};
+$('#spin').onclick=()=>{
+  if(busy)return; busy=true; $('#spin').disabled=true; $('#result').classList.remove('on');
+  const N=G.cs.length,k=Math.floor(Math.random()*N),j=(Math.random()-.5)*G.SEG*.7;
+  angle+=360*5+(((-(k*G.SEG+j)-angle)%360)+360)%360;
+  rot.style.transform=`rotate(${angle}deg)`;
+  curK=k; cur=G.cs[k]; word=cur.pun?'':pick(cur);
+  for(let i=0;i<28;i++)setTimeout(()=>sfx('spinTick'),4500*(1-(1-i/28)**(1/3)));
+  setTimeout(()=>{
+    busy=false; $('#spin').disabled=false; sfx('stop');
+    const p=$('#r-pill'); $('#go').textContent=cur.pun?'Complir':'Veure la paraula'; p.textContent=cur.i+' '+cur.n; p.style.setProperty('--c',PAL[k%PAL.length]);
+    $('#result').classList.add('on');
+    navigator.vibrate&&navigator.vibrate(40);
+  },4700);
+};
+/* ---------- Diàleg propi ---------- */
+function ask(text,yes="D'acord",no='Cancel·lar'){
+  return new Promise(res=>{
+    const m=$('#modal'); $('#m-text').textContent=text; $('#m-ok').textContent=yes;
+    $('#m-no').style.display=no?'':'none'; if(no)$('#m-no').textContent=no;
+    m.hidden=false;
+    const to=v=>{m.hidden=true;res(v)};
+    $('#m-ok').onclick=()=>to(true); $('#m-no').onclick=()=>to(false);
+  });
+}
+
+/* ---------- Equips i torns ---------- */
+let P,T=[],tt=0,streak=0,lastMsg='',tm=null,left=0,tdone=false;
+function prepare(cats,title,hint,back,drink){
+  if(!cats.some(c=>c.w.length))return false;
+  P={cats,title,hint,back,drink}; $('#t-note').textContent=drink?'🥤 Pots jugar amb begudes sense alcohol. Beu amb moderació i només si vols.':''; renderTeams(); show('s-teams'); return true;
+}
+const GOALS=[0,5,10,15,20];
+const goalChips=()=>GOALS.map(g=>`<button class="chip" data-g="${g}" aria-pressed="${S.cfg.goal===g}">${g||'Indefinit'}</button>`).join('');
+function renderGoal(){$('#t-goal').innerHTML=goalChips();$('#t-goal-n').value=GOALS.includes(S.cfg.goal)?'':S.cfg.goal}
+$('#t-goal-n').oninput=e=>{const v=Math.min(999,parseInt(e.target.value));if(v>=1){S.cfg.goal=v;save();$('#t-goal').innerHTML=goalChips()}};
+$('#t-goal').onclick=e=>{const c=e.target.closest('[data-g]');if(c){S.cfg.goal=+c.dataset.g;save();renderGoal()}};
+function renderTeams(){
+  renderGoal();
+  $('#t-list').innerHTML=S.teams.map((n,i)=>`<div class="row" style="flex-wrap:nowrap"><input data-i="${i}" value="${esc(n)}" maxlength="20" aria-label="Nom de l'equip ${i+1}">${S.teams.length>2?`<button class="chip" data-d="${i}" aria-label="Treure l'equip">✕</button>`:''}</div>`).join('');
+}
+$('#t-list').oninput=e=>{const i=e.target.dataset.i;if(i!==undefined){S.teams[+i]=e.target.value;save()}};
+$('#t-list').onclick=e=>{const d=e.target.closest('[data-d]');if(d){S.teams.splice(+d.dataset.d,1);save();renderTeams()}};
+$('#t-add').onclick=()=>{if(S.teams.length<6){S.teams.push('Equip '+(S.teams.length+1));save();renderTeams()}};
+$('#t-back').onclick=()=>show(P.back);
+$('#t-go').onclick=()=>{
+  T=S.teams.map((n,i)=>({n:n.trim()||'Equip '+(i+1),s:0,dr:0,gv:0})); tt=Math.random()*T.length|0; streak=0;
+  lastMsg=`🎲 Comença ${T[tt].n}!`; play(P.cats,P.title,P.hint); G.drink=!!P.drink; board();
+  if(G.drink){newForb();forbScreen(()=>show('s-wheel'))} sfx('start');
+};
+$('#g-back').onclick=()=>ask('Vols sortir de la partida? Es perdran els punts.','Sortir').then(y=>{if(y){stopTimer();show('s-home')}});
+function board(){
+  forbLine();
+  $('#score').innerHTML=T.map((t,i)=>`<span class="tm${i===tt?' on':''}">${esc(t.n)} <b>${t.s}</b>${G.drink?` 🍺${t.dr} 🎁${t.gv}`:''}</span>`).join('');
+  $('#turn').innerHTML=`${esc(lastMsg)} Torn de <b>${esc(T[tt].n)}</b> (encerts seguits: ${streak}/${S.cfg.streak})${S.cfg.goal?` · Meta: ${S.cfg.goal} punts`:''}`;
+}
+const nextTeam=()=>{tt=(tt+1)%T.length;streak=0};
+function verdict(r){
+  let m,ev=null; const dk=G.drink, cl=n=>Math.min(S.cfg.maxs,Math.max(1,n));
+  if(r===true){
+    T[tt].s++; streak++; sfx('ok');
+    if(dk)ev=give(tt,cl(D.bet?D.bet*D.mult:(Math.min(streak,2)+D.wb)*D.mult));
+    if(streak>=S.cfg.streak){m=`✔ ${T[tt].n} ha fet ${streak} encerts seguits!`;nextTeam()}else m=`✔ +1 per a ${T[tt].n}!`;
+  }else if(r===false||r===-1){
+    sfx('bad');
+    if(dk){const n=cl(D.bet?D.bet*D.mult:(base()+D.wb)*D.mult);ev=r===-1?allD(n):selfD(tt,n)}
+    m=r===-1?'Ningú l\'ha encertat.':`✘ ${T[tt].n} no l'ha encertada.`; nextTeam();
+  }else{T[r].s++;
+    if(dk){const n=cl(D.bet?D.bet*D.mult:(base()+D.wb)*D.mult);T.forEach((t,i)=>{if(i!==r)t.dr+=n});T[r].gv+=n*(T.length-1);ev={e:'🎁',t:`${T[r].n} reparteix!`,x:`Els altres equips beuen ${gl(n)}.`}}
+    tt=r; streak=0; sfx('ok'); m=`🏆 ${T[r].n} guanya la paraula!`}
+  const wn=T.find(t=>S.cfg.goal&&t.s>=S.cfg.goal);
+  stopTimer();
+  const fin=()=>{
+    lastMsg=m; board(); $('#result').classList.remove('on');
+    if(wn)return win(wn);
+    const go=()=>afterTurn(()=>show('s-wheel'));
+    if(dk&&S.cards.w.length&&Math.random()<[.08,.15,.25][S.cfg.int])return drinkScreen('Carta sorpresa',S.cards.w[Math.random()*S.cards.w.length|0],go,'🃏');
+    go();
+  };
+  if(dk&&ev)drinkScreen(ev.t,ev.x,fin,ev.e);else fin();
+}
+function win(w){
+  $('#win-name').textContent=w.n;
+  $('#win-board').innerHTML=[...T].sort((a,b)=>b.s-a.s).map(t=>`<span class="tm${t===w?' on':''}">${esc(t.n)} <b>${t.s}</b></span>`).join('');
+  $('#win-drink').innerHTML=G.drink?'<span class="note" style="width:100%">🍻 Glops beguts i repartits</span>'+[...T].sort((a,b)=>b.dr-a.dr).map(t=>`<span class="tm">${esc(t.n)} 🍺${t.dr} 🎁${t.gv}</span>`).join(''):'';
+  show('s-win'); sfx('win'); confetti();
+}
+function confetti(){
+  if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+  const em='🎉⭐🎊✨'.match(/./gu);
+  for(let i=0;i<36;i++){
+    const e=document.createElement('span'); e.className='cf'; e.textContent=em[i%4];
+    e.style.left=Math.random()*96+'vw'; e.style.animationDuration=2+Math.random()*2.5+'s'; e.style.animationDelay=Math.random()*.8+'s';
+    document.body.appendChild(e); setTimeout(()=>e.remove(),5600);
+  }
+}
+$('#win-again').onclick=()=>$('#t-go').click();
+$('#win-home').onclick=()=>show('s-home');
+
+/* ---------- Paraula, temporitzador i veredicte ---------- */
+const syncT=()=>{$('#t-start').disabled=tm!==null||tdone||$('#card').classList.contains('shown')};
+function stopTimer(){clearInterval(tm);tm=null;tdone=false;$('#timer').textContent='';$('#timer').classList.remove('urgent')}
+function showT(){$('#timer').textContent=left+' s';$('#timer').classList.toggle('urgent',left<=10)}
+$('#t-start').onclick=()=>{
+  if(tm!==null)return; left=S.cfg.time; showT(); sfx('start');
+  tm=setInterval(()=>{
+    left--; showT();
+    if(left<=0){clearInterval(tm);tm=null;tdone=true;$('#timer').textContent='⏰ Temps!';sfx('alarm');syncT()}
+    else if(left<=10)sfx('tick');
+  },1000);
+  syncT();
+};
+let D={mult:1,bet:0,wb:0,seen:false,mod:'',forb:''};
+const base=()=>[1,1,2][S.cfg.int];
+const gl=n=>n+(n===1?' glop':' glops');
+const isAll=c=>/-tots$/.test(c.id);
+const selfD=(i,n)=>{T[i].dr+=n;return{e:'🍺',t:`${T[i].n} beu!`,x:gl(n)}};
+const give=(i,n)=>{T[i].gv+=n;if(T.length===2)T[1-i].dr+=n;return{e:'🎁',t:`${T[i].n} reparteix!`,x:`${gl(n)} als rivals`}};
+const allD=n=>{T.forEach(t=>t.dr+=n);return{e:'🍻',t:'Tothom beu!',x:`${gl(n)} cadascú`}};
+function drinkScreen(t,x,after,e='🍻'){$('#dr-em').textContent=e;$('#dr-t').textContent=t;$('#dr-x').textContent=x;$('#dr-ok').onclick=after;sfx('drink');show('s-drink')}
+function punish(){
+  const b=Math.min(S.cfg.maxs,base()),t=T[tt]; let ev;
+  if(cur.pun==='self')ev=selfD(tt,b);
+  else if(cur.pun==='give')ev=give(tt,Math.min(S.cfg.maxs,2));
+  else ev=allD(b);
+  lastMsg=`${cur.i} ${cur.n}.`; nextTeam();
+  drinkScreen(ev.t,ev.x,()=>{board();$('#result').classList.remove('on');afterTurn(()=>show('s-wheel'))},ev.e);
+}
+function renderMod(){
+  $('#w-mod').textContent=[D.mod&&`🎯 Repte: ${D.mod} (glops ×2)`,D.bet&&`🎲 Aposta: ${gl(D.bet)}`,`🚫 Paraula prohibida: ${F.w}`].filter(Boolean).join('\n');
+}
+function renderBet(){
+  $('#bet').innerHTML=D.seen?'':'<span class="note" style="width:100%;text-align:center">'+(isAll(cur)?"🎲 Aposteu quants glops us jugueu (els equips que no l'encertin els beuen)":'🎲 Doble o res: aposta glops abans de veure la paraula')+'</span>'+[0,1,2,3].map(b=>`<button class="chip" data-b="${b}" aria-pressed="${D.bet===b}">${b?b+' glops':'Sense aposta'}</button>`).join('');
+}
+$('#bet').onclick=e=>{const c=e.target.closest('[data-b]');if(c&&!D.seen){D.bet=+c.dataset.b;renderBet();renderMod()}};
+function newForb(){
+  const L=S.forb.w.length?S.forb.w:FORB, o=L.filter(x=>x!==F.w), pl=o.length?o:L, w=pl[Math.random()*pl.length|0];
+  F={w,left:S.cfg.fn}; forbLine();
+}
+function forbLine(){
+  $('#fb').style.display=G&&G.drink?'flex':'none';
+  $('#fb-t').textContent=`🚫 Paraula prohibida: ${F.w} (${F.left} ${F.left===1?'torn':'torns'})`;
+}
+function forbScreen(after){
+  $('#fw').textContent=F.w; $('#fw-n').textContent=`Qui la digui beu ${gl(1)}. Durarà ${F.left} torns.`;
+  $('#fw-ok').onclick=after; sfx('bad'); show('s-forb');
+}
+function chalScreen(after){$('#ch-x').textContent=D.mod;$('#ch-ok').onclick=after;sfx('alarm');show('s-chal')}
+function afterTurn(next){
+  if(!G.drink)return next();
+  if(--F.left<=0){newForb();return forbScreen(next)}
+  forbLine(); next();
+}
+const said=back=>drinkScreen('Paraula prohibida!',`Qui l'ha dit beu ${gl(1)}.`,()=>show(back),'🚫');
+$('#w-forb').onclick=()=>said('s-word');
+$('#fb-btn').onclick=()=>said('s-wheel');
+$('#go').onclick=()=>{
+  if(cur.pun)return punish();
+  const col=PAL[curK%PAL.length],card=$('#card'),all=isAll(cur),dk=G.drink,mt=String(word).match(/^(.*?)\s*#(\d+)$/);
+  D={mult:1,bet:0,wb:mt?+mt[2]:0,seen:false,mod:'',forb:''};
+  if(dk){
+    if(Math.random()<[.12,.2,.35][S.cfg.int]){D.mod=MODS[Math.random()*MODS.length|0];D.mult=2}
+  }
+  card.classList.remove('shown'); card.style.setProperty('--c',col);
+  $('#w-badge').textContent=cur.i+' '+cur.n; $('#w-badge').style.setProperty('--c',col);
+  $('#w-hint').textContent=[all?'':`Dibuixa ${T[tt].n}.`,G.hint,cur.h].filter(Boolean).join(' ');
+  $('#word').textContent=mt?mt[1]:word; stopTimer(); $('#t-start').textContent=`⏱ Començar ${S.cfg.time} s`; syncT();
+  $('#dk').style.display=dk?'flex':'none'; if(dk){renderMod();renderBet()}
+  $('#vd').innerHTML=all
+    ?'<span class="note" style="width:100%">Quin equip l\'ha encertat?</span>'+T.map((t,i)=>`<button class="btn sm" data-v="${i}">${esc(t.n)}</button>`).join('')+'<button class="btn sm ghost" data-v="-1">Cap</button>'
+    :'<button class="v n" data-v="n" aria-label="Incorrecte">✘</button><button class="v y" data-v="y" aria-label="Correcte">✔</button>';
+  if(dk&&D.mod)chalScreen(()=>show('s-word'));else show('s-word');
+};
+$('#card').onclick=()=>{const card=$('#card');card.classList.toggle('shown');if(card.classList.contains('shown')&&G.drink&&!D.seen){D.seen=true;renderBet()}sfx(card.classList.contains('shown')?'reveal':'hide');syncT()};
+$('#vd').onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;const v=b.dataset.v;verdict(v==='y'?true:v==='n'?false:+v)};
+
+/* ---------- Editor de temàtica ---------- */
+let E;
+const parseW=()=>[...new Set($('#e-words').value.split('\n').map(x=>x.trim()).filter(Boolean))];
+const countW=()=>{const n=parseW().length;$('#e-count').textContent=n+(n===1?' paraula':' paraules')};
+function openEditor(arr,idx,back){
+  E={arr,idx,back}; const c=idx==null?{n:'',i:'',w:[]}:arr[idx];
+  $('#e-title').textContent=idx==null?'Nova temàtica':'Editar temàtica';
+  $('#e-name').value=c.n; $('#e-emoji').value=c.i; $('#e-words').value=c.w.join('\n');
+  $('#e-del').style.display=idx==null||arr[idx]===S.cards||arr[idx]===S.forb?'none':''; countW(); show('s-edit');
+}
+$('#e-words').oninput=countW;
+$('#e-save').onclick=()=>{
+  const n=$('#e-name').value.trim(); if(!n){$('#e-name').focus();return}
+  const o={n,i:$('#e-emoji').value.trim()||'🎨',w:parseW()};
+  if(E.idx==null)E.arr.push({id:'u'+Date.now().toString(36),h:'',...o}); else Object.assign(E.arr[E.idx],o);
+  save(); E.back();
+};
+$('#e-del').onclick=async()=>{
+  if(!await ask('Vols esborrar aquesta temàtica?','Esborrar'))return;
+  const c=E.arr.splice(E.idx,1)[0]; S.sel=S.sel.filter(x=>x!==c.id); save(); E.back();
+};
+$('#e-cancel').onclick=()=>E.back();
+
+/* ---------- Ajustos ---------- */
+let setMode='general';
+const backSet=()=>{renderSet();show('s-set')};
+function catList(el,arr,back){
+  el.insertAdjacentHTML('beforeend',arr.map((c,i)=>`<button class="item" data-i="${i}"><span>${esc(c.i)} ${esc(c.n)}</span><small>${c.w.length} paraules ›</small></button>`).join('')+'<button class="btn sm" data-i="new">+ Nova temàtica</button>');
+  el.querySelectorAll('[data-i]').forEach(x=>x.onclick=()=>openEditor(arr,x.dataset.i==='new'?null:+x.dataset.i,back));
+}
+function renderSet(){
+  $('#tabs').innerHTML=Object.keys(NAMES).map(m=>`<button class="chip" data-t="${m}" aria-pressed="${m===setMode}">${NAMES[m]}</button>`).join('');
+  const b=$('#set-body'); b.innerHTML='';
+  if(setMode==='general'){
+    b.innerHTML=`<label class="setrow">Temps del temporitzador (s)<input type="number" inputmode="numeric" min="10" max="600" step="5" data-k="time" value="${S.cfg.time}"></label><label class="setrow">Encerts seguits per canviar d'equip<input type="number" inputmode="numeric" min="1" max="10" data-k="streak" value="${S.cfg.streak}"></label><label class="setrow">🎵 Volum de la música<input type="range" min="0" max="100" data-v="vm" value="${S.cfg.vm}"></label><label class="setrow">🔊 Volum dels sons<input type="range" min="0" max="100" data-v="vs" value="${S.cfg.vs}"></label><label class="setrow">🚫 Torns amb la mateixa paraula prohibida<input type="number" inputmode="numeric" min="1" max="20" data-k="fn" value="${S.cfg.fn}"></label><label class="setrow">🍺 Màxim de glops per torn<input type="number" inputmode="numeric" min="1" max="30" data-k="maxs" value="${S.cfg.maxs}"></label><div class="chips"><span class="note" style="width:100%;text-align:left">Intensitat del mode Beure</span>${['Suau','Normal','Picant'].map((n,i)=>`<button class="chip" data-n="${i}" aria-pressed="${S.cfg.int===i}">${n}</button>`).join('')}</div><div class="chips"><button class="chip" data-c="sfx" aria-pressed="${S.cfg.sfx}">🔊 Efectes</button><button class="chip" data-c="music" aria-pressed="${S.cfg.music}">🎵 Música</button></div>`;
+    return;
+  }
+  if(setMode==='drink')b.innerHTML='<p class="note">Afegeix #2 al final d\'una paraula perquè valgui glops extra.</p><button class="btn sm ghost" id="cards-btn">🃏 Cartes sorpresa</button><button class="btn sm ghost" id="forb-btn">🚫 Paraules prohibides</button>';
+  if(setMode==='custom')b.innerHTML='<p class="note">Aquí hi ha les temàtiques que has creat. Les dels altres modes les tries dins de Personalitzat.</p>';
+  catList(b,S[setMode],backSet);
+  const cb=$('#cards-btn'); if(cb)cb.onclick=()=>openEditor([S.cards],0,backSet);
+  const fb=$('#forb-btn'); if(fb)fb.onclick=()=>openEditor([S.forb],0,backSet);
+  if(setMode!=='custom'){
+    const r=document.createElement('button'); r.className='btn sm ghost'; r.textContent='Restaurar valors per defecte';
+    r.onclick=()=>ask('Es perdran els canvis d\'aquest mode. Continuar?','Restaurar').then(y=>{if(y){S[setMode]=defs()[setMode];save();renderSet()}});
+    b.appendChild(r);
+  }
+}
+$('#tabs').onclick=e=>{const t=e.target.closest('[data-t]');if(t){setMode=t.dataset.t;renderSet()}};
+$('#set-body').addEventListener('change',e=>{
+  const k=e.target.dataset.k; if(!k)return;
+  const [mn,mx]=k==='time'?[10,600]:k==='maxs'?[1,30]:k==='fn'?[1,20]:[1,10], v=Math.min(mx,Math.max(mn,parseInt(e.target.value)||S.cfg[k]));
+  S.cfg[k]=v; e.target.value=v; save();
+});
+$('#set-body').addEventListener('input',e=>{const k=e.target.dataset.v;if(k)S.cfg[k]=+e.target.value});
+$('#set-body').addEventListener('change',e=>{const k=e.target.dataset.v;if(!k)return;save();if(k==='vs')sfx('ok')});
+$('#set-body').addEventListener('click',e=>{
+  const n=e.target.closest('[data-n]'); if(n){S.cfg.int=+n.dataset.n;save();renderSet();return}
+  const c=e.target.closest('[data-c]'); if(!c)return;
+  S.cfg[c.dataset.c]=!S.cfg[c.dataset.c]; c.setAttribute('aria-pressed',S.cfg[c.dataset.c]); save(); applyAudio();
+});
+
+/* ---------- Mode personalitzat ---------- */
+const msg=t=>{$('#c-msg').textContent=t};
+const chip=c=>`<button class="chip" data-id="${c.id}" aria-pressed="${S.sel.includes(c.id)}">${esc(c.i)} ${esc(c.n)}</button>`;
+const backCustom=()=>{renderCustom();show('s-custom')};
+function renderCustom(){
+  $('#c-exist').innerHTML='<h4>Clàssic</h4><div class="chips">'+S.classic.map(chip).join('')+'</div><h4>Mímica</h4><div class="chips">'+S.mime.map(chip).join('')+'</div>';
+  $('#c-mine').innerHTML=S.custom.length?S.custom.map(c=>`<span>${chip(c)} <button class="chip" data-e="${c.id}" aria-label="Editar ${esc(c.n)}">✏️</button></span>`).join(''):'<p class="note">Encara no n\'has creat cap.</p>';
+  $('#c-saves').innerHTML=S.saves.length?S.saves.map((s,i)=>`<div class="item"><span>${esc(s.name)}</span><span><button class="chip" data-l="${i}">Carregar</button> <button class="chip" data-x="${i}" aria-label="Esborrar ${esc(s.name)}">✕</button></span></div>`).join(''):'<p class="note">No tens cap partida guardada.</p>';
+}
+$('#s-custom').addEventListener('click',e=>{
+  const t=e.target.closest('button'); if(!t)return; const d=t.dataset;
+  if(d.id){const k=S.sel.indexOf(d.id);k<0?S.sel.push(d.id):S.sel.splice(k,1);save();t.setAttribute('aria-pressed',k<0)}
+  else if(d.e)openEditor(S.custom,S.custom.findIndex(c=>c.id===d.e),backCustom);
+  else if(d.l!==undefined){
+    const sv=S.saves[+d.l];
+    sv.cats.forEach(c=>{if(c.id[0]==='u'){const k=S.custom.findIndex(x=>x.id===c.id);k<0?S.custom.push(clone(c)):S.custom[k]=clone(c)}});
+    S.sel=sv.cats.map(c=>c.id).filter(id=>pool().some(c=>c.id===id)); save(); renderCustom(); msg('Partida carregada.');
+  }else if(d.x!==undefined){
+    ask('Vols esborrar aquesta partida guardada?','Esborrar').then(y=>{if(y){S.saves.splice(+d.x,1);save();renderCustom()}})
+  }
+});
+$('#c-new').onclick=()=>openEditor(S.custom,null,backCustom);
+$('#c-save').onclick=()=>{
+  const name=$('#c-name').value.trim(),cats=pool().filter(c=>S.sel.includes(c.id));
+  if(!name)return msg('Posa un nom a la partida.');
+  if(!cats.length)return msg('Tria alguna temàtica abans de guardar.');
+  const sv={name,cats:clone(cats)},k=S.saves.findIndex(s=>s.name===name);
+  k<0?S.saves.push(sv):S.saves[k]=sv; save(); renderCustom(); msg('Partida guardada.');
+};
+$('#c-play').onclick=()=>{
+  const cs=pool().filter(c=>S.sel.includes(c.id)&&c.w.length);
+  if(!cs.length)return msg('Tria almenys una temàtica amb paraules.');
+  prepare(cs,'Personalitzat','','s-custom');
+};
+</script>
+</body>
+</html>
